@@ -161,3 +161,11 @@ test('Service: release() interacts correctly with the sliding estimate across a 
   service.release({ policy: 'api', subject: 'u1', consumedAt: new Date(last.consumedAt).toISOString() });
   assert.equal(service.usage('api', 'u1').decision.limits[0].used, 2, '4 left in window 0, weighted at 50%');
 });
+
+test('seedPolicies creates missing policies once and never touches existing ones', () => {
+  const { service } = testService();
+  assert.deepEqual(service.seedPolicies([{ name: 'auth-public', limits: [{ limit: 20, window: 60 }] }]), ['auth-public']);
+  service.updatePolicy('auth-public', { limits: [{ limit: 5, window: 60 }] });
+  assert.deepEqual(service.seedPolicies([{ name: 'auth-public', limits: [{ limit: 20, window: 60 }] }, { name: 'other', limits: [{ limit: 1, window: 1 }] }]), ['other']);
+  assert.equal(JSON.parse(service.getPolicy('auth-public').limits)[0].limit, 5, 'an operator change survives a restart');
+});

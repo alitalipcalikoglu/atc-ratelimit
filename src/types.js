@@ -32,6 +32,7 @@
  * @property {number} maxBatch
  * @property {number} cleanupIntervalSec
  * @property {number} statsRetentionDays
+ * @property {{ name: string, limits: { limit: number, window: number }[] }[]} policySeeds
  */
 
 /** @typedef {import('./config.js').Config} Config */

@@ -80,7 +80,7 @@ Scenario walkthroughs for every feature live in [examples/](examples/README.md).
 
 ## Configuration
 
-Environment only; see [.env.example](.env.example). Required: `RATELIMIT_API_KEYS`. Notable: `MAX_LIMITS` (windows per policy), `MAX_WINDOW_SEC`, `MAX_COST`, `MAX_BATCH`, `CLEANUP_INTERVAL_SEC`, `STATS_RETENTION_DAYS`, `RATE_LIMIT_MAX` (the service's own per-key limit), `TRUST_PROXY`, `TLS_CERT_PATH` / `TLS_KEY_PATH`.
+Environment only; see [.env.example](.env.example). Required: `RATELIMIT_API_KEYS`. Notable: `POLICY_SEEDS` (`name=limit/window[+…]`, policies created at start when missing, never changed afterwards; the stack seeds the ones its gateway routes use), `MAX_LIMITS` (windows per policy), `MAX_WINDOW_SEC`, `MAX_COST`, `MAX_BATCH`, `CLEANUP_INTERVAL_SEC`, `STATS_RETENTION_DAYS`, `RATE_LIMIT_MAX` (the service's own per-key limit), `TRUST_PROXY`, `TLS_CERT_PATH` / `TLS_KEY_PATH`.
 
 ## Security notes
 

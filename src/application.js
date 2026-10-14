@@ -46,9 +46,11 @@ export class Application {
 
   async start() {
     const { config } = this;
+    const seeded = this.service.seedPolicies(config.policySeeds);
     const api = new RateLimitApi({ config, audit: this.audit, service: this.service, policies: this.policies, overrides: this.overrides, db: this.db, version: this.version });
     const app = await api.build();
     this.app = app;
+    if (seeded.length) app.log.info({ policies: seeded }, 'policies created from POLICY_SEEDS');
     const { shutdown } = Lifecycle.install({
       forceExitMs: 30_000,
       log: app.log,

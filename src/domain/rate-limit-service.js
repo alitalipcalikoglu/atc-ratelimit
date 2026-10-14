@@ -67,6 +67,21 @@ export class RateLimitService {
     return this.policies.insert({ name: input.name, description: input.description ?? '', limits: JSON.stringify(Limits.normalize(input.limits, this.options)), created_by: by, created_at: t, updated_at: t });
   }
 
+  /**
+   * Create the seeded policies that do not exist yet (never changes an existing one).
+   * @param {readonly { name: string, limits: unknown }[]} seeds
+   * @returns {string[]} names created
+   */
+  seedPolicies(seeds) {
+    const created = [];
+    for (const seed of seeds) {
+      if (this.policies.get(seed.name)) continue;
+      this.createPolicy({ name: seed.name, description: 'created from POLICY_SEEDS', limits: seed.limits }, 'POLICY_SEEDS');
+      created.push(seed.name);
+    }
+    return created;
+  }
+
   /** @param {string} name */
   getPolicy(name) {
     return this.policies.require(name);

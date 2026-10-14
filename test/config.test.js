@@ -20,3 +20,9 @@ test('Config: rejects bad input', () => {
   bad({ MAX_BATCH: '0' }, />= 1/);
   bad({ TLS_CERT_PATH: '/x.pem' }, /must be set together/);
 });
+
+test('Config: POLICY_SEEDS parses name=limit/window[+…] and rejects bad entries', () => {
+  const c = Config.fromEnv(testEnv({ POLICY_SEEDS: 'auth-public=20/60, api=100/60+1000/3600' }));
+  assert.deepEqual(c.policySeeds.map((p) => [p.name, p.limits.map((l) => `${l.limit}/${l.window}`)]), [['auth-public', ['20/60']], ['api', ['100/60', '1000/3600']]]);
+  for (const bad of ['x', '=5/60', 'a=5', 'a=5/60,a=1/60', 'A B=5/60']) assert.throws(() => Config.fromEnv(testEnv({ POLICY_SEEDS: bad })), ConfigError, bad);
+});

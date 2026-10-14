@@ -30,6 +30,7 @@ export class Config {
     this.maxBatch = v.maxBatch;
     this.cleanupIntervalSec = v.cleanupIntervalSec;
     this.statsRetentionDays = v.statsRetentionDays;
+    this.policySeeds = Object.freeze(v.policySeeds.map((p) => Object.freeze({ name: p.name, limits: Object.freeze([...p.limits]) })));
     Object.freeze(this);
   }
 
@@ -56,6 +57,7 @@ export class Config {
       dbBackupDir: r.optional('DB_BACKUP_DIR') || undefined,
       apiKeys: Config.#parseApiKeys(r.required('RATELIMIT_API_KEYS')),
       rateLimitMax: r.integer('RATE_LIMIT_MAX', 6_000, { min: 1 }),
+      policySeeds: Config.#parseSeeds(r.optional('POLICY_SEEDS')),
       maxLimits: r.integer('MAX_LIMITS', 5, { min: 1, max: 20 }),
       maxWindowSec: r.integer('MAX_WINDOW_SEC', 2_592_000, { min: 1 }),
       maxCost: r.integer('MAX_COST', 1_000_000, { min: 1 }),
@@ -63,6 +65,30 @@ export class Config {
       cleanupIntervalSec: r.integer('CLEANUP_INTERVAL_SEC', 60, { min: 1 }),
       statsRetentionDays: r.integer('STATS_RETENTION_DAYS', 30, { min: 1 }),
     });
+  }
+
+  /**
+   * `name=limit/window[+limit/window],…` (window in seconds): policies created at start when
+   * missing, so a fresh stack has the policies its gateway routes name. Existing policies are never
+   * touched, so changes made through the API survive restarts.
+   * @param {string} raw @returns {{ name: string, limits: { limit: number, window: number }[] }[]}
+   */
+  static #parseSeeds(raw) {
+    /** @type {{ name: string, limits: { limit: number, window: number }[] }[]} */
+    const out = [];
+    for (const entry of raw.split(',').map((x) => x.trim()).filter(Boolean)) {
+      const at = entry.indexOf('=');
+      const name = at > 0 ? entry.slice(0, at) : '';
+      if (!Config.POLICY_PATTERN.test(name)) throw new ConfigError(`POLICY_SEEDS entry "${entry}" needs a policy name before "="`);
+      if (out.some((p) => p.name === name)) throw new ConfigError(`POLICY_SEEDS lists "${name}" twice`);
+      const limits = entry.slice(at + 1).split('+').map((part) => {
+        const m = /^(\d{1,9})\/(\d{1,9})$/.exec(part.trim());
+        if (!m) throw new ConfigError(`POLICY_SEEDS "${name}": "${part}" must be limit/window, e.g. 20/60`);
+        return { limit: Number(m[1]), window: Number(m[2]) };
+      });
+      out.push({ name, limits });
+    }
+    return out;
   }
 
   /**
