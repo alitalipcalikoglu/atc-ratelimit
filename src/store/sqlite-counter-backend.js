@@ -17,7 +17,7 @@ import { SlidingWindow } from '../domain/sliding-window.js';
  * has exactly one writer at a time regardless of how many readers/writers attempt a transaction
  * concurrently, so the batch's read-evaluate-write is genuinely all-or-nothing for the whole
  * process. A second connection attempting `BEGIN IMMEDIATE` while this one holds the lock blocks
- * for up to `PRAGMA busy_timeout` (5000 ms, set once per connection in `service-core`'s
+ * for up to `PRAGMA busy_timeout` (5000 ms, set once per connection in `atc-service-core`'s
  * `Database`) before SQLite raises `SQLITE_BUSY` — this is real cross-connection concurrency
  * control, not a same-process convenience.
  *

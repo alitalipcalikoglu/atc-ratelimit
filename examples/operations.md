@@ -48,7 +48,7 @@ One process per database file: SQLite serialises writers, and every check is one
 
 ```bash
 docker build -t atc-ratelimit .
-docker run -d -p 3011:3011 -v ratelimit-data:/data --env-file .env atc-ratelimit
+docker run -d -p 3011:3011 -v atc-ratelimit-data:/data --env-file .env atc-ratelimit
 ```
 
 ## Backups

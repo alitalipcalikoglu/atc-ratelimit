@@ -18,7 +18,7 @@ rcurl -X PUT $RL/v1/policies/api/overrides/key_partner -d '{
     "limits": [ { "window": 60, "limit": 1000 }, { "window": 86400, "limit": 500000 } ],
     "blocked": false, "note": "Contract 2026-14, 10x plan",
     "expiresAt": null, "expired": false,
-    "createdBy": "console", "createdAt": "...", "updatedAt": "..."
+    "createdBy": "atc-console", "createdAt": "...", "updatedAt": "..."
   }
 }
 ```

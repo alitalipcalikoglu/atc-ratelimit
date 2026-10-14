@@ -1,7 +1,7 @@
-# `ratelimit` readiness contract
+# `atc-ratelimit` readiness contract
 
 ## Purpose
-`ratelimit` lets the rest of the platform enforce shared rate limits and quotas without each
+`atc-ratelimit` lets the rest of the platform enforce shared rate limits and quotas without each
 service reinventing counters: named policies with several sliding-time windows, per-subject
 overrides (larger quotas or hard blocks), one atomic check-and-consume per request or per batch of
 policies, a release for work that failed after the check succeeded, usage lookups, top-consumer
@@ -9,14 +9,14 @@ listings and hourly allow/deny statistics. It decides; enforcement (answering `4
 caller or the gateway.
 
 ## Dependencies
-- `audit` (`AUDIT_URL` + `AUDIT_API_KEY`): optional, both-or-neither. Same mechanism as `flags` and
-  `shortlink` — `src/net/audit-client.js` is byte-identical across all three (verified with `diff`).
+- `atc-audit` (`AUDIT_URL` + `AUDIT_API_KEY`): optional, both-or-neither. Same mechanism as `atc-flags` and
+  `atc-shortlink` — `src/net/audit-client.js` is byte-identical across all three (verified with `diff`).
   Unset: writes still succeed. Set: write events (policy/override create, update, delete, subject
   reset) are buffered in memory and flushed on a background 2s timer, never on the request path —
   an unreachable or slow audit service never slows down or fails a check, release, or management
   call. Buffered-and-unflushed events are lost on an ungraceful restart.
 
-No other service or external system is called by `ratelimit`.
+No other service or external system is called by `atc-ratelimit`.
 
 ## Persistence
 Engine: SQLite via `node:sqlite`'s `DatabaseSync` (`src/db.js`), WAL journal mode, `synchronous =
@@ -39,7 +39,7 @@ Schema (one migration block, `Database.MIGRATIONS[0]`):
   `allowed`, `denied`; PK `(policy, hour_start)`. This is the durable source for
   `GET /v1/policies/:name/stats` and `GET /v1/stats`.
 
-Migration mechanism: identical pattern to `flags`/`shortlink` — `Database.MIGRATIONS` array gated by
+Migration mechanism: identical pattern to `atc-flags`/`atc-shortlink` — `Database.MIGRATIONS` array gated by
 `PRAGMA user_version`, each block in its own transaction. Fresh install and "upgrade from nothing"
 are the same today (one migration). No down-migration mechanism.
 
@@ -49,7 +49,7 @@ process event loop is otherwise alive. Logged at `warn`.
 
 ## Readiness endpoint
 `GET /ready` calls `this.db.ping()` (`SELECT 1`), cached for `RateLimitApi.READY_CACHE_MS =
-10_000`ms — same mechanism as `flags`/`shortlink`. Read-only, no mutation, no discarded work, safe
+10_000`ms — same mechanism as `atc-flags`/`atc-shortlink`. Read-only, no mutation, no discarded work, safe
 to poll at any interval.
 
 ## Graceful shutdown
@@ -59,7 +59,7 @@ including in-progress checks) → `await this.audit.close()` (stop timer, final 
 `this.db.close()`. A `30_000`ms unref'd force-exit timer runs in parallel. `unhandledRejection`
 routes through the same graceful path; `uncaughtException` calls `process.exit(1)` immediately,
 skipping drain and final audit flush. PM2 `kill_timeout: 35000`ms — 5s above the internal 30s
-force-exit, same numbers and comment as `flags`/`shortlink`.
+force-exit, same numbers and comment as `atc-flags`/`atc-shortlink`.
 
 ## Resource limits
 - `BODY_LIMIT` (env, default `65_536` bytes).
@@ -68,7 +68,7 @@ force-exit, same numbers and comment as `flags`/`shortlink`.
 - `MAX_COST` (env, default `1_000_000`) — largest `cost` one check/release may use.
 - `MAX_BATCH` (env, default `20`, range 1–100) — checks per `/v1/check/batch` call.
 - `RATE_LIMIT_MAX` (env, default `6_000`) — requests per API key per minute against this service's
-  own `/v1/*` (the service rate-limits itself the same way `flags`/`shortlink` do).
+  own `/v1/*` (the service rate-limits itself the same way `atc-flags`/`atc-shortlink` do).
 - `max_memory_restart: '300M'` in `ecosystem.config.cjs`.
 - No explicit page-size cap is enforced server-side for `/v1/policies/:name/overrides` beyond the
   caller-supplied `limit`/`offset` (default `limit=50`, `offset=0`, no documented server-side max).
@@ -77,13 +77,13 @@ force-exit, same numbers and comment as `flags`/`shortlink`.
 - Audit outbound call: `timeoutMs = 5_000` default, unchanged by `Application`.
 - Shutdown force-exit: `30_000`ms, hard-coded.
 - PM2 `listen_timeout: 10000`ms.
-- No outward per-request timeout beyond the audit client's — `ratelimit` never calls another
+- No outward per-request timeout beyond the audit client's — `atc-ratelimit` never calls another
   service synchronously in the request path; every check/release/usage/stats operation is a local
   SQLite transaction.
 
 ## Retry policy
 Only the audit forwarding path retries, off the request path, on a background timer. Identical
-numbers to `flags`/`shortlink` (byte-identical `AuditClient`): `MAX_ATTEMPTS = 6`, backoff `min(30_000,
+numbers to `atc-flags`/`atc-shortlink` (byte-identical `AuditClient`): `MAX_ATTEMPTS = 6`, backoff `min(30_000,
 500 * 2 ** attempt)`ms, no jitter; non-429 4xx drops the batch permanently; 429/5xx/network
 error/timeout keeps it buffered for the next `flushMs = 2_000`ms tick once all attempts in the
 current call are exhausted. There is no retry logic anywhere else in this service — `checkMany` and
@@ -162,9 +162,9 @@ after that backup are lost and callers checking against a policy created after t
 - `ratelimit_process_uptime_seconds` — process-local, resets on restart.
 
 ## Logging
-Same as `flags`/`shortlink`: Fastify default request logger, `requestIdHeader: 'x-request-id'`,
+Same as `atc-flags`/`atc-shortlink`: Fastify default request logger, `requestIdHeader: 'x-request-id'`,
 `genReqId: randomUUID`, `reqId` on every log line per
-[OBSERVABILITY.md](../../stack/docs/OBSERVABILITY.md), `req.headers.authorization` redacted. Not
+[OBSERVABILITY.md](../../atc-stack/docs/OBSERVABILITY.md), `req.headers.authorization` redacted. Not
 emitted: `traceId`, `spanId`, `route`/`op`, `durationMs` (Fastify's `responseTime` field, different
 name), `upstream`/`upstreamMs` (no proxied calls), `service`, `version`. `code` is in every JSON
 error body but only additionally logged for 500s via `request.log.error({ err }, 'unhandled error')`.
@@ -175,16 +175,16 @@ gateway, console or peers) and generates one when absent. Also parses an inbound
 `@atc-web/atc-service-core`'s `registerRequestContext`, trust-gated on `TRUST_PROXY` (same boundary as
 `X-Forwarded-*`): trusted, the caller's trace-id is continued with a fresh span-id; untrusted or
 malformed, a fresh trace is started. Both `traceId`/`spanId` are logged on every request line.
-`gateway`'s own `rate-limit-client.js` explicitly sends its own `traceparent`/`X-Request-Id` on
+`atc-gateway`'s own `rate-limit-client.js` explicitly sends its own `traceparent`/`X-Request-Id` on
 every policy check (post-production Phase 5), so this is a real inbound trace, not just a parser
 capability. No outbound calls happen in the request path (audit is async, off-path, and doesn't
 forward request-scoped headers), so there is nothing to propagate onward regardless.
 
 ## Security model
 Bearer API keys (`RATELIMIT_API_KEYS=id:secret[:role[:policies]]`), compared via SHA-256 +
-`timingSafeEqual` (same `ApiKeyAuth` pattern as `flags`/`shortlink`). Roles: `check` (only
+`timingSafeEqual` (same `ApiKeyAuth` pattern as `atc-flags`/`atc-shortlink`). Roles: `check` (only
 `/v1/check`, `/v1/check/batch`, `/v1/release`), `read`, `write`, `readwrite` (default) — `check` is
-unique to this service among the four reviewed (`flags`/`shortlink` only have `read`/`write`/
+unique to this service among the four reviewed (`atc-flags`/`atc-shortlink` only have `read`/`write`/
 `readwrite`), reflecting that most callers (the gateway, other backends) should only be able to
 spend quota, never redefine it. Policy scoping: a key's `policies` list (or `null` for all) is
 enforced on every route naming a policy (`ApiKeyAuth.assertPolicy`), including hiding scoped-out
@@ -194,7 +194,7 @@ custom JSON content-type parser that returns a clean `400 INVALID_JSON` instead 
 error on malformed JSON (`removeContentTypeParser`/`addContentTypeParser` in `rate-limit-api.js`);
 limits are validated against `MAX_LIMITS`/`MAX_WINDOW_SEC`/`MAX_COST` at policy-create/update and
 override-set time, not just at check time. Out of scope: authenticating whoever the `subject` string
-represents (it's an opaque string the caller vouches for — `ratelimit` does not verify a subject is
+represents (it's an opaque string the caller vouches for — `atc-ratelimit` does not verify a subject is
 a real user/IP/key), enforcement itself (this service only decides `allowed`; a `429` response to
 the *original* caller of whatever service is being protected is the caller's job).
 
@@ -205,7 +205,7 @@ already states this explicitly ("Distributed counters across several instances o
 process owns one database").
 
 **The check/consume path specifically is safe under two processes sharing one file**, which is a
-materially different answer from `shortlink`'s redirect path. `RateLimitService` never touches
+materially different answer from `atc-shortlink`'s redirect path. `RateLimitService` never touches
 SQLite directly (Stage 5: it depends on the `CounterBackend` interface,
 `src/domain/counter-backend.js`, only). `SqliteCounterBackend.checkAndConsume`
 (`src/store/sqlite-counter-backend.js`) wraps the *entire* read-decide-write sequence — reading the
@@ -221,7 +221,7 @@ OS processes connected to the same file. This means a second process's `checkAnd
 begin *its* `BEGIN IMMEDIATE` transaction — and therefore cannot read the counters — until the first
 process's transaction has fully committed or rolled back. There is no window, within or across
 processes, where two `checkAndConsume` calls for the same (or different) subjects can interleave
-their read and write halves — unlike `shortlink`'s `follow()`, where the `maxClicks` read happens
+their read and write halves — unlike `atc-shortlink`'s `follow()`, where the `maxClicks` read happens
 *outside* the transaction that performs the write. This is exercised with REAL cross-connection
 concurrency (separate `node:worker_threads`, each with its own `DatabaseSync` against the same
 file, not same-process `Promise.all`) in `test/concurrency.test.js`.
@@ -240,7 +240,7 @@ the next interval. The real problem with two instances is entirely the **process
 the database: `RateLimitService.tally` (the source of `ratelimit_decisions_total` in `/metrics`) and
 the readiness cache would each be independent per process, so `/metrics` and `/ready` would report
 different, incomplete pictures depending on which instance answered a given request — exactly the
-same class of issue `flags` has with its own per-process evaluation cache and counters, not a
+same class of issue `atc-flags` has with its own per-process evaluation cache and counters, not a
 data-correctness issue.
 
 **Redis-readiness (reviewed, not implemented — Stage 5 explicitly stops here).** A Redis-backed
@@ -255,8 +255,8 @@ contract in backend-agnostic terms (no Redis-specific concepts leak into the int
 implementation is expected to satisfy `test/backend-contract.test.js` unchanged.
 
 ## Single-node / multi-node guarantees
-Running two `ratelimit` instances against the same `DB_PATH` is not a topology this repository ships
-or tests (`instances: 1` is pinned, and the README says so), but unlike `shortlink`, the specific
+Running two `atc-ratelimit` instances against the same `DB_PATH` is not a topology this repository ships
+or tests (`instances: 1` is pinned, and the README says so), but unlike `atc-shortlink`, the specific
 concern that motivated this question — whether the check/consume path itself could let two processes
 jointly over-spend a policy's quota — **does not apply here**: `BEGIN IMMEDIATE` around the full
 read-then-write sequence serializes it globally, so quota enforcement itself would remain correct
@@ -281,8 +281,8 @@ many processes are involved.
   but the in-flight check being served at the moment of the kill gets no response — a caller cannot
   tell whether that check's cost was actually consumed, and retrying it risks double-charging.
 - **Two instances run against one file**: the check/consume path itself stays correct (see Scaling
-  model above — this is the one respect in which `ratelimit` is *more* robust to this scenario than
-  `shortlink`), but `/metrics`' `ratelimit_decisions_total` and each instance's own readiness cache
+  model above — this is the one respect in which `atc-ratelimit` is *more* robust to this scenario than
+  `atc-shortlink`), but `/metrics`' `ratelimit_decisions_total` and each instance's own readiness cache
   would diverge between the two processes, giving an operator an incomplete picture depending on
   which instance answers a given `/metrics` or `/ready` poll.
 - **`release()` called after a window boundary has passed since the original check, with

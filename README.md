@@ -24,7 +24,7 @@ Production with Docker (mount the database directory):
 
 ```bash
 docker build -t atc-ratelimit .
-docker run -p 3011:3011 -v ratelimit-data:/data --env-file .env atc-ratelimit
+docker run -p 3011:3011 -v atc-ratelimit-data:/data --env-file .env atc-ratelimit
 ```
 
 Tests and type check:
@@ -179,8 +179,8 @@ See [docs/READINESS.md](docs/READINESS.md) for the full contract.
 
 Requests are logged with `reqId` (accepts or generates `X-Request-Id`) and `traceId`/`spanId` (a
 trusted inbound `traceparent`, gated on `TRUST_PROXY`, continues the caller's trace with a fresh
-span-id for this hop — `gateway`'s own `rate-limit-client.js` explicitly propagates its trace on
-every policy check; see [OBSERVABILITY.md](../stack/docs/OBSERVABILITY.md)). `/health` is a static check; `/ready` pings the database, cached for 10s. Note
+span-id for this hop — `atc-gateway`'s own `rate-limit-client.js` explicitly propagates its trace on
+every policy check; see [OBSERVABILITY.md](../atc-stack/docs/OBSERVABILITY.md)). `/health` is a static check; `/ready` pings the database, cached for 10s. Note
 that `/metrics`' `ratelimit_decisions_total` is a process-local counter that resets on restart and
 can disagree with the durable totals `/v1/stats` reports from the `decisions` table. See
 [docs/READINESS.md](docs/READINESS.md) for the full contract.
@@ -190,7 +190,7 @@ can disagree with the durable totals `/v1/stats` reports from the `decisions` ta
 The state to protect is the SQLite file at `DB_PATH` (default `./data/ratelimit.db`, plus WAL
 sidecars while running) — policy and override definitions matter most; counters and hourly
 statistics are comparatively disposable. Use `stack backup`/`stack restore` from the workspace root
-(see `stack/docs/UPGRADE.md`) to snapshot and restore this service's database consistently alongside
+(see `atc-stack/docs/UPGRADE.md`) to snapshot and restore this service's database consistently alongside
 the rest of the stack. On every start, before applying a pending migration to an existing database,
 the service itself also snapshots the file to `DB_PATH.pre-v<N>-<timestamp>` (directory overridable
 with `DB_BACKUP_DIR`) — a manual last resort if `stack restore` is unavailable. See

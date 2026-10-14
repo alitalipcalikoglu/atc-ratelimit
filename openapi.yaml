@@ -15,7 +15,7 @@ info:
     always return HTTP `200` for a well-formed, authorized request — whether the business decision
     is `allowed: true` or `allowed: false` is carried entirely in the JSON body's `allowed` field
     (and, for a batch, in each result's own `allowed` field plus the top-level `allowed`). An HTTP
-    `429` from this service means something completely different: it is `ratelimit`'s own
+    `429` from this service means something completely different: it is `atc-ratelimit`'s own
     self-throttle (`@fastify/rate-limit`, keyed by API-key id, scoped to the whole `/v1` sub-app)
     protecting the service itself from being called too often — it has nothing to do with any
     policy's own limits. Do not branch on HTTP status to detect a rate-limit denial; branch on the
@@ -157,7 +157,7 @@ paths:
         `allowed` field, never the HTTP status. This is deliberate, not an oversight: only this
         service's own self-throttle (see `components.responses.RateLimited`) ever produces an HTTP
         `429` here, and it is a completely separate mechanism from a policy's own limit — a `429`
-        means "you called `ratelimit` itself too often," never "this subject is over its policy
+        means "you called `atc-ratelimit` itself too often," never "this subject is over its policy
         limit." No `Retry-After` HTTP header is ever set for a business-level denial; the
         domain-level `retryAfter` on the returned `Decision` is body-only.
 
@@ -931,7 +931,7 @@ components:
       properties:
         service:
           type: string
-          const: ratelimit
+          const: atc-ratelimit
         version:
           type: string
           description: ratelimit's own package.json version.

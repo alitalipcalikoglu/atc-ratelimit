@@ -24,7 +24,7 @@ rcurl -X POST $RL/v1/policies -d '{
     "overrides": 0,
     "activeSubjects": 0,
     "last24h": { "allowed": 0, "denied": 0 },
-    "createdBy": "console",
+    "createdBy": "atc-console",
     "createdAt": "2026-09-17T10:00:00.000Z",
     "updatedAt": "2026-09-17T10:00:00.000Z"
   }
