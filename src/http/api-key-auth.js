@@ -1,4 +1,4 @@
-import { ApiKeyAuth as CoreApiKeyAuth } from '@atc-web/service-core/auth';
+import { ApiKeyAuth as CoreApiKeyAuth } from '@atc-web/atc-service-core/auth';
 import { RateLimitError } from '../domain/errors.js';
 
 /** @typedef {import('../types.js').ApiKey} ApiKey */

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { readServiceVersion } from '@atc-web/service-core/fastify';
+import { readServiceVersion } from '@atc-web/atc-service-core/fastify';
 import { CHECK_KEY, READ_KEY, RW_KEY, SHOP_KEY, WRITE_KEY, bearer, buildApp } from './helpers.js';
 
 const json = (/** @type {import('light-my-request').Response} */ r) => JSON.parse(r.body);
@@ -21,7 +21,7 @@ test('API: probes, auth, roles and policy scoping', async (t) => {
   const infoBody = json(info);
   assert.deepEqual(
     [infoBody.service, infoBody.version, infoBody.apiVersion, infoBody.capabilities],
-    ['ratelimit', PACKAGE_VERSION, 'v1', ['policy-windows', 'overrides', 'usage-stats']],
+    ['atc-ratelimit', PACKAGE_VERSION, 'v1', ['policy-windows', 'overrides', 'usage-stats']],
   );
   assert.equal(typeof infoBody.schemaVersion, 'number');
   assert.equal(typeof infoBody.serviceCore, 'string');

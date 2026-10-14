@@ -15,12 +15,12 @@ One event per completed write request, `outcome: "success"` for 2xx, `outcome: "
 
 | Action | Request |
 |---|---|
-| `ratelimit.policy.create` | `POST /v1/policies` |
-| `ratelimit.policy.update` | `PATCH /v1/policies/:name` |
-| `ratelimit.policy.delete` | `DELETE /v1/policies/:name` |
-| `ratelimit.override.set` | `PUT /v1/policies/:name/overrides/:subject` |
-| `ratelimit.override.delete` | `DELETE /v1/policies/:name/overrides/:subject` |
-| `ratelimit.subject.reset` | `DELETE /v1/policies/:name/subjects/:subject/usage` |
+| `atc-ratelimit.policy.create` | `POST /v1/policies` |
+| `atc-ratelimit.policy.update` | `PATCH /v1/policies/:name` |
+| `atc-ratelimit.policy.delete` | `DELETE /v1/policies/:name` |
+| `atc-ratelimit.override.set` | `PUT /v1/policies/:name/overrides/:subject` |
+| `atc-ratelimit.override.delete` | `DELETE /v1/policies/:name/overrides/:subject` |
+| `atc-ratelimit.subject.reset` | `DELETE /v1/policies/:name/subjects/:subject/usage` |
 
 ## Event shape
 
@@ -28,7 +28,7 @@ One event per completed write request, `outcome: "success"` for 2xx, `outcome: "
 {
   "id": "0f1a…",
   "at": "2026-09-17T10:00:00.000Z",
-  "action": "ratelimit.policy.create",
+  "action": "atc-ratelimit.policy.create",
   "outcome": "success",
   "actor": { "type": "apikey", "id": "console" },
   "target": { "type": "…", "id": "…" },

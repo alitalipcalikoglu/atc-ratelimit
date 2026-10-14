@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { AuditClient } from '@atc-web/service-core/audit';
+import { AuditClient } from '@atc-web/atc-service-core/audit';
 import { WRITE_KEY, READ_KEY, bearer, buildApp } from './helpers.js';
 
 const json = (/** @type {import('light-my-request').Response} */ r) => JSON.parse(r.body);
@@ -44,11 +44,11 @@ test('API: write routes record audit events with actor, target and request conte
   assert.ok(res.statusCode < 300, res.body);
   assert.equal(audit.buffer.length, 1);
   const e = audit.buffer[0];
-  assert.deepEqual([e.action, e.outcome, e.actor, e.target, e.userAgent, typeof e.requestId, typeof e.id, e.ip], ['ratelimit.policy.create', 'success', { type: 'apikey', id: e.actor?.id }, { type: 'policy', id: 'api' }, 'test-agent', 'string', 'string', '127.0.0.1']);
+  assert.deepEqual([e.action, e.outcome, e.actor, e.target, e.userAgent, typeof e.requestId, typeof e.id, e.ip], ['atc-ratelimit.policy.create', 'success', { type: 'apikey', id: e.actor?.id }, { type: 'policy', id: 'api' }, 'test-agent', 'string', 'string', '127.0.0.1']);
   assert.ok(e.actor?.id);
   const denied = await app.inject({ method: 'POST', url: '/v1/policies', headers: bearer(READ_KEY), payload: { name: 'x', limits: [{ window: 60, limit: 3 }] } });
   assert.equal(denied.statusCode, 403);
-  assert.deepEqual([audit.buffer.length, audit.buffer[1].action, audit.buffer[1].outcome], [2, 'ratelimit.policy.create', 'denied']);
+  assert.deepEqual([audit.buffer.length, audit.buffer[1].action, audit.buffer[1].outcome], [2, 'atc-ratelimit.policy.create', 'denied']);
   await app.inject({ url: '/v1/nope', headers: bearer(WRITE_KEY) });
   assert.equal(audit.buffer.length, 2, 'reads and 404s are not audit events');
 });

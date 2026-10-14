@@ -7,7 +7,7 @@ const path = require('node:path');
 module.exports = {
   apps: [
     {
-      name: 'ratelimit',
+      name: 'atc-ratelimit',
       cwd: __dirname,
       script: 'src/index.js',
       node_args: ['--disable-warning=ExperimentalWarning', `--env-file=${path.join(__dirname, '.env')}`],

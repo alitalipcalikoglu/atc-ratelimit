@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: ratelimit
+  title: atc-ratelimit
   version: "1.1.0"
   description: >-
     Central rate limits and quotas for every service in the atc-web platform: named policies with
@@ -28,7 +28,7 @@ security:
 paths:
   /openapi.yaml:
     get:
-      operationId: ratelimit.openapi
+      operationId: atc-ratelimit.openapi
       summary: Download the canonical OpenAPI document
       description: Returns this service's repository-root OpenAPI 3.1 document byte-for-byte.
       security: []
@@ -41,7 +41,7 @@ paths:
 
   /health:
     get:
-      operationId: ratelimit.health.check
+      operationId: atc-ratelimit.health.check
       summary: Liveness check
       description: Always returns 200 once the process is accepting connections. No dependency checks.
       x-stack-visibility: public
@@ -60,7 +60,7 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
   /ready:
     get:
-      operationId: ratelimit.ready.check
+      operationId: atc-ratelimit.ready.check
       summary: Readiness check
       description: >-
         Pings the SQLite database (`db.ping()`); result cached 10s. 200 when the ping succeeds, 503
@@ -93,7 +93,7 @@ paths:
                 $ref: '#/components/schemas/ReadyResponse'
   /v1/info:
     get:
-      operationId: ratelimit.info.get
+      operationId: atc-ratelimit.info.get
       summary: Service identity and capabilities
       description: >-
         Static identity and capability information. Registered directly on the app, outside the
@@ -115,7 +115,7 @@ paths:
                 $ref: '#/components/schemas/InfoResponse'
   /metrics:
     get:
-      operationId: ratelimit.metrics.get
+      operationId: atc-ratelimit.metrics.get
       summary: Prometheus metrics
       description: >-
         Prometheus text exposition format: policy count, decisions since process start per policy
@@ -145,7 +145,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
   /v1/check:
     post:
-      operationId: ratelimit.check
+      operationId: atc-ratelimit.check
       summary: Check and consume one subject's quota against one policy
       description: >-
         Evaluates every window of the effective limit set (the subject's active override, if any,
@@ -204,7 +204,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /v1/check/batch:
     post:
-      operationId: ratelimit.checkBatch
+      operationId: atc-ratelimit.checkBatch
       summary: Check and consume several (policy, subject) pairs as one atomic unit
       description: >-
         Same all-or-nothing atomicity and the same `200`-even-when-denied contract as `POST
@@ -266,7 +266,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /v1/release:
     post:
-      operationId: ratelimit.release
+      operationId: atc-ratelimit.release
       summary: Give back units consumed by an earlier check
       description: >-
         For an operation that consumed quota via `POST /v1/check` and then itself failed, releases
@@ -317,7 +317,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /v1/policies:
     post:
-      operationId: ratelimit.policies.create
+      operationId: atc-ratelimit.policies.create
       summary: Create a policy
       description: >-
         Requires a `write` (or `readwrite`) API key, scoped to the new policy's own name. Returns
@@ -359,7 +359,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
     get:
-      operationId: ratelimit.policies.list
+      operationId: atc-ratelimit.policies.list
       summary: List policies visible to this API key
       description: >-
         Requires a `read` (or `readwrite`) API key. Filtered to the key's own `policies` scope when
@@ -386,7 +386,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /v1/policies/{name}:
     get:
-      operationId: ratelimit.policies.get
+      operationId: atc-ratelimit.policies.get
       summary: Get one policy
       description: Requires a `read` (or `readwrite`) API key, scoped to this policy.
       x-required-role: read
@@ -416,7 +416,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
     patch:
-      operationId: ratelimit.policies.patch
+      operationId: atc-ratelimit.policies.patch
       summary: Update a policy's description and/or limits
       description: >-
         Requires a `write` (or `readwrite`) API key, scoped to this policy. At least one of
@@ -459,7 +459,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
     delete:
-      operationId: ratelimit.policies.delete
+      operationId: atc-ratelimit.policies.delete
       summary: Delete a policy
       description: >-
         Requires a `write` (or `readwrite`) API key, scoped to this policy. Deletes the policy along
@@ -488,7 +488,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /v1/policies/{name}/stats:
     get:
-      operationId: ratelimit.policies.getStats
+      operationId: atc-ratelimit.policies.getStats
       summary: Hourly allowed/denied series for a policy
       description: >-
         Requires a `read` (or `readwrite`) API key, scoped to this policy. Hourly series for the
@@ -529,7 +529,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /v1/policies/{name}/top:
     get:
-      operationId: ratelimit.policies.getTop
+      operationId: atc-ratelimit.policies.getTop
       summary: Subjects with the highest usage in one window of a policy
       description: >-
         Requires a `read` (or `readwrite`) API key, scoped to this policy. `window` defaults to the
@@ -581,7 +581,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /v1/policies/{name}/overrides:
     get:
-      operationId: ratelimit.overrides.list
+      operationId: atc-ratelimit.overrides.list
       summary: List a policy's subject overrides
       description: Requires a `read` (or `readwrite`) API key, scoped to this policy. Offset-paginated.
       x-required-role: read
@@ -626,7 +626,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /v1/policies/{name}/overrides/{subject}:
     put:
-      operationId: ratelimit.overrides.set
+      operationId: atc-ratelimit.overrides.set
       summary: Create or replace a subject's override
       description: >-
         Requires a `write` (or `readwrite`) API key, scoped to this policy. Upsert — always
@@ -673,7 +673,7 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
     delete:
-      operationId: ratelimit.overrides.delete
+      operationId: atc-ratelimit.overrides.delete
       summary: Remove a subject's override
       description: >-
         Requires a `write` (or `readwrite`) API key, scoped to this policy. `404 OVERRIDE_NOT_FOUND`
@@ -708,7 +708,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /v1/policies/{name}/subjects/{subject}:
     get:
-      operationId: ratelimit.subjects.getUsage
+      operationId: atc-ratelimit.subjects.getUsage
       summary: Current usage of one subject, without consuming
       description: >-
         Requires a `read` (or `readwrite`) API key, scoped to this policy. A peek: `remaining` in
@@ -743,7 +743,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /v1/policies/{name}/subjects/{subject}/usage:
     delete:
-      operationId: ratelimit.subjects.resetUsage
+      operationId: atc-ratelimit.subjects.resetUsage
       summary: Forget every counter of a subject
       description: >-
         Requires a `write` (or `readwrite`) API key, scoped to this policy. Unlike the other
@@ -778,7 +778,7 @@ paths:
           $ref: '#/components/responses/RateLimited'
   /v1/stats:
     get:
-      operationId: ratelimit.stats.get
+      operationId: atc-ratelimit.stats.get
       summary: Aggregate statistics across every policy visible to this API key
       description: >-
         Requires a `read` (or `readwrite`) API key. Scoped the same way as `GET /v1/policies` — only
@@ -949,7 +949,7 @@ components:
           description: The database's current schema version (SQLite `PRAGMA user_version`).
         serviceCore:
           type: string
-          description: The @atc-web/service-core version actually running.
+          description: The @atc-web/atc-service-core version actually running.
     PolicyNameValue:
       type: string
       pattern: '^[a-z0-9]+([.\-_][a-z0-9]+)*$'

@@ -1,4 +1,4 @@
-# ratelimit
+# atc-ratelimit
 
 Central rate limits and quotas for every service: named policies with several windows (100 per minute and 20 000 per day), per-subject overrides and blocks, one atomic check per request or per group of policies, a release for work that failed, usage lookups, top consumers and hourly statistics. Sliding-window counters in SQLite, no external store. HTTP only.
 
@@ -84,7 +84,7 @@ Environment only; see [.env.example](.env.example). Required: `RATELIMIT_API_KEY
 
 ## Security notes
 
-- API keys: compared in constant time against every configured key (SHA-256 digest + `timingSafeEqual`, no early exit), so timing never reveals whether, or which, key matched (`@atc-web/service-core/auth`, `ApiKeyAuth`).
+- API keys: compared in constant time against every configured key (SHA-256 digest + `timingSafeEqual`, no early exit), so timing never reveals whether, or which, key matched (`@atc-web/atc-service-core/auth`, `ApiKeyAuth`).
 - Roles: `check`/`read`/`write`/`readwrite`, enforced per route (`ApiKeyAuth.require`). A policy scope on a key (`id:secret:role:policy+policy`) additionally restricts it to those policies — `ApiKeyAuth.assertPolicy` runs on every route that names a policy and returns `403 FORBIDDEN` for one outside the key's scope; an unscoped key can see and touch every policy.
 - The service rate-limits itself per key (`RATE_LIMIT_MAX` per minute, `@fastify/rate-limit`, keyed on the caller's API key id) in addition to the limits it hands out to callers.
 - Request bodies capped at `BODY_LIMIT` (default 64 KiB); `Cache-Control: no-store` on every response.
