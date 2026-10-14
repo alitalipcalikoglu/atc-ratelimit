@@ -1,6 +1,6 @@
 {
   "name": "@atc-web/atc-ratelimit",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "private": true,
   "description": "Central rate limits and quotas for every service: named policies with several windows, subject overrides and blocks, one atomic check per request or per group, usage and decision statistics; SQLite, no external store",
   "license": "MIT",
