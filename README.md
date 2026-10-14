@@ -185,6 +185,8 @@ that `/metrics`' `ratelimit_decisions_total` is a process-local counter that res
 can disagree with the durable totals `/v1/stats` reports from the `decisions` table. See
 [docs/READINESS.md](docs/READINESS.md) for the full contract.
 
+Audit forwarding is observable too: `audit_forward_enabled`, `audit_forward_events_total{result="recorded|sent|dropped|failed"}` and `audit_forward_pending`. A rising `dropped`, or a `pending` that does not drain, means audit events are being lost or delayed; alert on it.
+
 ## Backup / restore
 
 The state to protect is the SQLite file at `DB_PATH` (default `./data/ratelimit.db`, plus WAL
