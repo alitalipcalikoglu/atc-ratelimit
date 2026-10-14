@@ -103,8 +103,7 @@ test('Service: usage, reset, top, stats, cleanup and policy removal', () => {
 });
 
 // Stage 5: release() must decrement the window that was actually consumed, not whichever window
-// `now` happens to be in at release time (the bug documented in ARCHITECTURE_AUDIT.md / README's
-// old "Scaling model" text, `rate-limit-service.js:162` before this stage).
+// `now` happens to be in at release time.
 test('Service: release() targets the consumed window, not the release-time window', () => {
   const { service, clock, counters } = testService();
   service.createPolicy({ name: 'api', limits: [{ window: 60, limit: 3 }] }, 'admin');
