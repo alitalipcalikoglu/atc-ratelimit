@@ -8,6 +8,7 @@ import { ApiKeyAuth } from './api-key-auth.js';
 import { Schemas } from './schemas.js';
 import { Views } from './views.js';
 import { AuditMetrics } from '../audit-metrics.js';
+import { MemoryCounterBackend } from '../store/memory-counter-backend.js';
 
 /** @typedef {import('../config.js').Config} Config */
 /** @typedef {import('fastify').FastifyInstance} FastifyInstance */
@@ -67,7 +68,7 @@ export class RateLimitApi {
     registerInfo(app, {
       service: 'atc-ratelimit',
       version: this.version,
-      capabilities: ['policy-windows', 'overrides', 'usage-stats'],
+      capabilities: ['policy-windows', 'overrides', 'usage-stats', `counters-${config.counterBackend}`],
       schemaVersion: this.db.schemaVersion,
     });
     await app.register((api) => this.#registerV1(api), { prefix: '/v1' });
@@ -179,6 +180,11 @@ export class RateLimitApi {
         '# HELP ratelimit_counters Live window counters.',
         '# TYPE ratelimit_counters gauge',
         `ratelimit_counters ${this.service.counterTotal()}`,
+        ...(this.service.backend instanceof MemoryCounterBackend ? [
+          '# HELP ratelimit_counter_flushes_total Memory backend flushes to SQLite, by result.', '# TYPE ratelimit_counter_flushes_total counter',
+          `ratelimit_counter_flushes_total{result="ok"} ${this.service.backend.flushes}`, `ratelimit_counter_flushes_total{result="error"} ${this.service.backend.flushErrors}`,
+          '# HELP ratelimit_counter_unflushed Counters changed since the last flush (lost on a crash).', '# TYPE ratelimit_counter_unflushed gauge', `ratelimit_counter_unflushed ${this.service.backend.dirty.size}`,
+        ] : []),
         '# HELP ratelimit_db_bytes Database size.',
         '# TYPE ratelimit_db_bytes gauge',
         `ratelimit_db_bytes ${this.db.sizeBytes()}`,

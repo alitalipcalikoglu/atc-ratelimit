@@ -31,6 +31,8 @@
  * @property {number} maxCost
  * @property {number} maxBatch
  * @property {number} cleanupIntervalSec
+ * @property {'sqlite'|'memory'} counterBackend  memory: counters in process memory, flushed to SQLite every counterFlushMs; one process only.
+ * @property {number} counterFlushMs
  * @property {number} statsRetentionDays
  * @property {{ name: string, limits: { limit: number, window: number }[] }[]} policySeeds
  */

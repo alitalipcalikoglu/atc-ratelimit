@@ -62,3 +62,30 @@ Policies and overrides are configuration worth backing up; counters are transien
 ## Latency
 
 A check is one round trip plus one SQLite transaction, typically under a millisecond in the service. Put the service on the same network as its callers and keep the client timeout short (300 ms in the [middleware example](middleware.md)); when a limiter is slower than the work it protects, it is the bottleneck.
+
+## High-throughput counters
+
+When a single ratelimit process becomes the bottleneck (every check is one SQLite write), switch to the memory backend:
+
+```
+COUNTER_BACKEND=memory
+COUNTER_FLUSH_MS=1000
+```
+
+Checks are then answered from memory; changed counters and hourly totals are written to SQLite once per `COUNTER_FLUSH_MS`. `GET /v1/info` lists `counters-memory` in `capabilities`.
+
+Watch it in `/metrics`:
+
+```
+ratelimit_counter_flushes_total{result="ok"} 8231
+ratelimit_counter_flushes_total{result="error"} 0
+ratelimit_counter_unflushed 14
+```
+
+A rising `error` count means the disk refused the writes; counters stay in memory and are retried on the next flush.
+
+Pitfalls:
+
+- Run exactly one process per database. Two processes with the memory backend each keep their own counts, so a limit of 100 lets 200 through.
+- A crash (not a clean stop) loses up to one flush interval of consumption: those clients get that much extra once. `pm2 stop` / `SIGTERM` flushes first.
+- Lowering `COUNTER_FLUSH_MS` shrinks that window at the cost of more writes; 100 ms is the minimum.

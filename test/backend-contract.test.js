@@ -6,7 +6,13 @@ import { test } from 'node:test';
 import { Database } from '../src/db.js';
 import { CounterStore } from '../src/store/counter-store.js';
 import { PolicyStore } from '../src/store/policy-store.js';
+import { MemoryCounterBackend } from '../src/store/memory-counter-backend.js';
 import { SqliteCounterBackend } from '../src/store/sqlite-counter-backend.js';
+
+// test/backend-contract-memory.test.js runs this same file against MemoryCounterBackend.
+const KIND = process.env.CONTRACT_BACKEND === 'memory' ? 'memory' : 'sqlite';
+/** @param {Database} db @returns {import('../src/domain/counter-backend.js').CounterBackend & { stop?: () => void }} */
+const make = (db) => (KIND === 'memory' ? new MemoryCounterBackend(new CounterStore(db), { flushMs: 1_000, now: () => T }) : new SqliteCounterBackend(db, new CounterStore(db)));
 
 /**
  * Contract suite for any `CounterBackend` implementation. Runs against `SqliteCounterBackend`
@@ -34,13 +40,13 @@ function makeBackend(policyNames = ['api']) {
   const db = new Database(':memory:');
   const policies = new PolicyStore(db);
   for (const name of policyNames) policies.insert({ name, description: '', limits: '[]', created_by: 'test', created_at: 0, updated_at: 0 });
-  return { backend: new SqliteCounterBackend(db, new CounterStore(db)), close: () => {} };
+  return { backend: make(db), close: () => {} };
 }
 
 const T = Date.parse('2026-09-17T10:00:00Z');
 const windowStart = (/** @type {number} */ w, /** @type {number} */ now) => Math.floor(now / (w * 1000)) * (w * 1000);
 
-test('Backend contract: first consume is allowed and decrements remaining', () => {
+test(`[${KIND}] Backend contract: first consume is allowed and decrements remaining`, () => {
   const { backend } = makeBackend();
   const checks = [{ policy: 'api', subject: 'u1', cost: 1, limits: [{ window: 60, limit: 3 }] }];
   const r = backend.checkAndConsume(checks, T);
@@ -49,7 +55,7 @@ test('Backend contract: first consume is allowed and decrements remaining', () =
   assert.equal(after.states[0][0].used, 1, 'the consumed unit is now reflected');
 });
 
-test('Backend contract: limit reached denies and does not over-consume', () => {
+test(`[${KIND}] Backend contract: limit reached denies and does not over-consume`, () => {
   const { backend } = makeBackend();
   const checks = [{ policy: 'api', subject: 'u1', cost: 1, limits: [{ window: 60, limit: 2 }] }];
   backend.checkAndConsume(checks, T);
@@ -60,7 +66,7 @@ test('Backend contract: limit reached denies and does not over-consume', () => {
   assert.equal(after.states[0][0].used, 2, 'still exactly 2, not 3');
 });
 
-test('Backend contract: independent policy/subject/window keys never interfere', () => {
+test(`[${KIND}] Backend contract: independent policy/subject/window keys never interfere`, () => {
   const { backend } = makeBackend(['api', 'other']);
   backend.checkAndConsume([{ policy: 'api', subject: 'u1', cost: 1, limits: [{ window: 60, limit: 1 }] }], T);
   const other = [
@@ -71,7 +77,7 @@ test('Backend contract: independent policy/subject/window keys never interfere',
   assert.deepEqual(other.map((r) => r.allowed), [true, true, true], 'a different policy, subject or window is a wholly separate counter');
 });
 
-test('Backend contract: one check with several limits evaluates and reports every one', () => {
+test(`[${KIND}] Backend contract: one check with several limits evaluates and reports every one`, () => {
   const { backend } = makeBackend();
   const checks = [{ policy: 'api', subject: 'u1', cost: 1, limits: [{ window: 60, limit: 5 }, { window: 3600, limit: 2 }] }];
   backend.checkAndConsume(checks, T);
@@ -80,7 +86,7 @@ test('Backend contract: one check with several limits evaluates and reports ever
   assert.deepEqual([r.allowed, r.states[0][0].allowed, r.states[0][1].allowed], [false, true, false], 'the hourly limit blocks even though the minute limit still has room');
 });
 
-test('Backend contract: checkMany consumes every check only when all pass', () => {
+test(`[${KIND}] Backend contract: checkMany consumes every check only when all pass`, () => {
   const { backend } = makeBackend(['api', 'login']);
   const checks = [
     { policy: 'api', subject: 'u1', cost: 1, limits: [{ window: 60, limit: 5 }] },
@@ -92,7 +98,7 @@ test('Backend contract: checkMany consumes every check only when all pass', () =
   assert.deepEqual([peek.states[0][0].used, peek.states[1][0].used], [1, 1], 'both checks were consumed');
 });
 
-test('Backend contract: checkMany — one denied check consumes nothing for the whole batch', () => {
+test(`[${KIND}] Backend contract: checkMany — one denied check consumes nothing for the whole batch`, () => {
   const { backend } = makeBackend(['api', 'login']);
   backend.checkAndConsume([{ policy: 'login', subject: 'u1', cost: 1, limits: [{ window: 60, limit: 1 }] }], T); // exhaust login first
   const checks = [
@@ -105,7 +111,7 @@ test('Backend contract: checkMany — one denied check consumes nothing for the 
   assert.equal(peek.states[0][0].used, 0, 'the check that would have passed on its own consumed nothing');
 });
 
-test('Backend contract: peek never consumes, allowed or not', () => {
+test(`[${KIND}] Backend contract: peek never consumes, allowed or not`, () => {
   const { backend } = makeBackend();
   const checks = [{ policy: 'api', subject: 'u1', cost: 1, limits: [{ window: 60, limit: 1 }] }];
   backend.checkAndConsume(checks, T, { peek: true });
@@ -114,7 +120,7 @@ test('Backend contract: peek never consumes, allowed or not', () => {
   assert.deepEqual([r.allowed, r.states[0][0].used], [true, 0], 'three peeks, still nothing consumed');
 });
 
-test('Backend contract: concurrent consume at the boundary (interleaved calls, one connection)', () => {
+test(`[${KIND}] Backend contract: concurrent consume at the boundary (interleaved calls, one connection)`, () => {
   const { backend } = makeBackend();
   const checks = [{ policy: 'api', subject: 'u1', cost: 1, limits: [{ window: 60, limit: 1 }] }];
   // Two "racing" attempts for the single remaining unit. Node's sync SQLite bindings make this
@@ -124,7 +130,7 @@ test('Backend contract: concurrent consume at the boundary (interleaved calls, o
   assert.deepEqual(results.map((r) => r.allowed).sort(), [false, true], 'exactly one of the two consumed the single unit');
 });
 
-test('Backend contract: release restores the same window when no boundary was crossed', () => {
+test(`[${KIND}] Backend contract: release restores the same window when no boundary was crossed`, () => {
   const { backend } = makeBackend();
   const limits = [{ window: 60, limit: 3 }];
   backend.checkAndConsume([{ policy: 'api', subject: 'u1', cost: 1, limits }], T);
@@ -132,7 +138,7 @@ test('Backend contract: release restores the same window when no boundary was cr
   assert.deepEqual([state.used, state.remaining], [0, 3]);
 });
 
-test('Backend contract: release after a window rollover still targets the consumed window', () => {
+test(`[${KIND}] Backend contract: release after a window rollover still targets the consumed window`, () => {
   const { backend } = makeBackend();
   const limits = [{ window: 60, limit: 3 }];
   const w0 = windowStart(60, T);
@@ -145,7 +151,7 @@ test('Backend contract: release after a window rollover still targets the consum
   assert.equal(ifReleasedAtNow.remaining, 3, 'still 3 — releasing "at w1" targets the (empty) w1 window and changes nothing further');
 });
 
-test('Backend contract: duplicate and excess release never takes a counter negative', () => {
+test(`[${KIND}] Backend contract: duplicate and excess release never takes a counter negative`, () => {
   const { backend } = makeBackend();
   const limits = [{ window: 60, limit: 3 }];
   backend.checkAndConsume([{ policy: 'api', subject: 'u1', cost: 1, limits }], T);
@@ -155,18 +161,19 @@ test('Backend contract: duplicate and excess release never takes a counter negat
   assert.deepEqual([state.used, state.remaining], [0, 3], 'never negative, never over-credited past the limit');
 });
 
-test('Backend contract: counters survive a restart (reopen against the same file)', () => {
+test(`[${KIND}] Backend contract: counters survive a restart (reopen against the same file)`, () => {
   const dir = mkdtempSync(join(tmpdir(), 'ratelimit-backend-contract-'));
   const path = join(dir, 'counters.db');
   try {
     const db1 = new Database(path);
     new PolicyStore(db1).insert({ name: 'api', description: '', limits: '[]', created_by: 'test', created_at: 0, updated_at: 0 });
-    const backend1 = new SqliteCounterBackend(db1, new CounterStore(db1));
+    const backend1 = make(db1);
     backend1.checkAndConsume([{ policy: 'api', subject: 'u1', cost: 2, limits: [{ window: 60, limit: 5 }] }], T);
+    backend1.stop?.(); // the memory backend writes its counters on a clean shutdown
     db1.close();
 
     const db2 = new Database(path); // simulates the process restarting against the same DB_PATH
-    const backend2 = new SqliteCounterBackend(db2, new CounterStore(db2));
+    const backend2 = make(db2);
     const r = backend2.checkAndConsume([{ policy: 'api', subject: 'u1', cost: 0, limits: [{ window: 60, limit: 5 }] }], T, { peek: true });
     assert.equal(r.states[0][0].used, 2, 'the count from before the restart is still there');
     db2.close();
@@ -175,7 +182,7 @@ test('Backend contract: counters survive a restart (reopen against the same file
   }
 });
 
-test('Backend contract: cleanup removes windows two spans old, and only those', () => {
+test(`[${KIND}] Backend contract: cleanup removes windows two spans old, and only those`, () => {
   const { backend } = makeBackend();
   const limits = [{ window: 60, limit: 5 }];
   backend.checkAndConsume([{ policy: 'api', subject: 'old', cost: 1, limits }], T);

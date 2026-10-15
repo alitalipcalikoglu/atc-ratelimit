@@ -29,6 +29,8 @@ export class Config {
     this.maxCost = v.maxCost;
     this.maxBatch = v.maxBatch;
     this.cleanupIntervalSec = v.cleanupIntervalSec;
+    this.counterBackend = v.counterBackend;
+    this.counterFlushMs = v.counterFlushMs;
     this.statsRetentionDays = v.statsRetentionDays;
     this.policySeeds = Object.freeze(v.policySeeds.map((p) => Object.freeze({ name: p.name, limits: Object.freeze([...p.limits]) })));
     Object.freeze(this);
@@ -38,6 +40,12 @@ export class Config {
    * @param {NodeJS.ProcessEnv} [env]
    * @returns {Config}
    */
+  /** @param {string} v @returns {'sqlite'|'memory'} */
+  static #backend(v) {
+    if (v !== 'sqlite' && v !== 'memory') throw new ConfigError('COUNTER_BACKEND must be sqlite or memory');
+    return v;
+  }
+
   static fromEnv(env = process.env) {
     const r = new EnvReader(env);
 
@@ -63,6 +71,8 @@ export class Config {
       maxCost: r.integer('MAX_COST', 1_000_000, { min: 1 }),
       maxBatch: r.integer('MAX_BATCH', 20, { min: 1, max: 100 }),
       cleanupIntervalSec: r.integer('CLEANUP_INTERVAL_SEC', 60, { min: 1 }),
+      counterBackend: Config.#backend(r.optional('COUNTER_BACKEND') || 'sqlite'),
+      counterFlushMs: r.integer('COUNTER_FLUSH_MS', 1_000, { min: 100, max: 60_000 }),
       statsRetentionDays: r.integer('STATS_RETENTION_DAYS', 30, { min: 1 }),
     });
   }

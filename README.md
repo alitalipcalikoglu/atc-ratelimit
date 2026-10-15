@@ -80,7 +80,7 @@ Scenario walkthroughs for every feature live in [examples/](examples/README.md).
 
 ## Configuration
 
-Environment only; see [.env.example](.env.example). Required: `RATELIMIT_API_KEYS`. Notable: `POLICY_SEEDS` (`name=limit/window[+…]`, policies created at start when missing, never changed afterwards; the stack seeds the ones its gateway routes use), `MAX_LIMITS` (windows per policy), `MAX_WINDOW_SEC`, `MAX_COST`, `MAX_BATCH`, `CLEANUP_INTERVAL_SEC`, `STATS_RETENTION_DAYS`, `RATE_LIMIT_MAX` (the service's own per-key limit), `TRUST_PROXY`, `TLS_CERT_PATH` / `TLS_KEY_PATH`.
+Environment only; see [.env.example](.env.example). Required: `RATELIMIT_API_KEYS`. Notable: `POLICY_SEEDS` (`name=limit/window[+…]`, policies created at start when missing, never changed afterwards; the stack seeds the ones its gateway routes use), `MAX_LIMITS` (windows per policy), `MAX_WINDOW_SEC`, `MAX_COST`, `MAX_BATCH`, `CLEANUP_INTERVAL_SEC`, `STATS_RETENTION_DAYS`, `COUNTER_BACKEND` (`sqlite` default, or `memory`: counters in memory, flushed every `COUNTER_FLUSH_MS`, one process only; see "Scaling model"), `RATE_LIMIT_MAX` (the service's own per-key limit), `TRUST_PROXY`, `TLS_CERT_PATH` / `TLS_KEY_PATH`.
 
 ## Security notes
 
@@ -124,8 +124,23 @@ With `AUDIT_URL` and `AUDIT_API_KEY` set, every completed write request is forwa
 One process owns one SQLite file (`instances: 1`). `RateLimitService` (the domain layer: policies,
 overrides, the "most restrictive window" logic) depends only on a `CounterBackend` interface
 (`domain/counter-backend.js`) — it holds no SQL, no transaction object, nothing SQLite-specific.
-`SqliteCounterBackend` (`store/sqlite-counter-backend.js`) is the only implementation: it wraps
-`CounterStore` (raw SQL) and owns the transaction the domain layer used to hold directly.
+Two implementations exist, chosen with `COUNTER_BACKEND`: `SqliteCounterBackend`
+(`store/sqlite-counter-backend.js`, the default) wraps `CounterStore` (raw SQL) and owns the
+transaction the domain layer used to hold directly; `MemoryCounterBackend`
+(`store/memory-counter-backend.js`) keeps counters in process memory and flushes them to SQLite every
+`COUNTER_FLUSH_MS` (see "Memory backend" below).
+
+**Memory backend (`COUNTER_BACKEND=memory`).** Every check with the SQLite backend is one write
+transaction, and SQLite has one writer: on very busy routes that is the ceiling. The memory backend
+answers a check with a few in-memory lookups and writes the changed counters and the hourly decision
+totals to SQLite in one transaction every `COUNTER_FLUSH_MS` (default 1000 ms). The batch
+all-or-nothing contract holds because a check runs synchronously to the end inside the one process.
+Costs: it is strictly one process per database (a second process would keep its own counts and the
+effective limit would double; PM2 `instances: 1` is already the default); a crash loses at most the
+last flush interval of consumption, so clients may get that much extra allowance once; a clean
+shutdown flushes, and start-up loads the live counters back. Statistics (`/stats`, hourly series)
+flush first, so they stay exact. `/metrics` adds `ratelimit_counter_flushes_total{result}` and
+`ratelimit_counter_unflushed`.
 
 The check/consume path (`checkAndConsume`) wraps the whole read-decide-write sequence, across every
 limit of every check in a batch, in one `BEGIN IMMEDIATE` transaction — SQLite's single writer makes
@@ -145,7 +160,7 @@ old behavior; that is only correct when the release happens inside the same wind
 counter is clamped at zero on every release, however many times or with however large a cost it is
 called — never negative, never more than a limit's own window can hold.
 
-**Multi-process, one host: yes. Distributed: no.** `SqliteCounterBackend` serializes writers at the
+**Multi-process, one host: yes (SQLite backend only). Distributed: no.** `SqliteCounterBackend` serializes writers at the
 SQLite *file* level — correct for several processes on one host sharing one `DB_PATH`, which is the
 supported topology (class B, see [docs/READINESS.md](docs/READINESS.md)). It is not a distributed
 counter: two processes pointed at two different files, or the same file over a network filesystem

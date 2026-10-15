@@ -8,6 +8,7 @@ import { RateLimitApi } from './http/rate-limit-api.js';
 import { CounterStore } from './store/counter-store.js';
 import { OverrideStore } from './store/override-store.js';
 import { PolicyStore } from './store/policy-store.js';
+import { MemoryCounterBackend } from './store/memory-counter-backend.js';
 import { SqliteCounterBackend } from './store/sqlite-counter-backend.js';
 import { CleanupWorker } from './worker.js';
 
@@ -21,7 +22,10 @@ export class Application {
     this.db = new Database(config.dbPath, { backupDir: config.dbBackupDir });
     this.policies = new PolicyStore(this.db);
     this.overrides = new OverrideStore(this.db);
-    this.backend = new SqliteCounterBackend(this.db, new CounterStore(this.db));
+    const counters = new CounterStore(this.db);
+    this.backend = config.counterBackend === 'memory'
+      ? new MemoryCounterBackend(counters, { flushMs: config.counterFlushMs })
+      : new SqliteCounterBackend(this.db, counters);
     this.service = new RateLimitService({ backend: this.backend, policies: this.policies, overrides: this.overrides, options: config });
     /** @type {import('fastify').FastifyInstance|null} */
     this.app = null;
@@ -57,6 +61,7 @@ export class Application {
       steps: [
         () => this.worker?.stop(),
         () => this.app?.close(),
+        () => { if (this.backend instanceof MemoryCounterBackend) this.backend.stop(); },
         () => this.audit.close(),
         () => this.db.close(),
       ],
@@ -64,11 +69,16 @@ export class Application {
     this.shutdown = shutdown;
     this.audit.logger = app.log;
     this.audit.start();
+    if (this.backend instanceof MemoryCounterBackend) {
+      const log = app.log.child({ component: 'counters' });
+      this.backend.onError = (err) => log.error({ err }, 'counter flush failed; kept in memory for the next try');
+      this.backend.start();
+    }
     await app.listen({ port: config.port, host: config.host });
     this.worker = new CleanupWorker({ service: this.service, intervalMs: config.cleanupIntervalSec * 1000, logger: app.log });
     this.worker.runOnce();
     this.worker.start();
-    app.log.info({ tls: config.tls !== null, policies: this.policies.all().length }, config.tls ? 'serving HTTPS' : 'serving plain HTTP, terminate TLS at a reverse proxy');
+    app.log.info({ tls: config.tls !== null, counterBackend: config.counterBackend, policies: this.policies.all().length }, config.tls ? 'serving HTTPS' : 'serving plain HTTP, terminate TLS at a reverse proxy');
     if (process.send) process.send('ready'); // PM2 wait_ready
   }
 }

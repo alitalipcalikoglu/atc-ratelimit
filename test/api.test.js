@@ -21,7 +21,7 @@ test('API: probes, auth, roles and policy scoping', async (t) => {
   const infoBody = json(info);
   assert.deepEqual(
     [infoBody.service, infoBody.version, infoBody.apiVersion, infoBody.capabilities],
-    ['atc-ratelimit', PACKAGE_VERSION, 'v1', ['policy-windows', 'overrides', 'usage-stats']],
+    ['atc-ratelimit', PACKAGE_VERSION, 'v1', ['policy-windows', 'overrides', 'usage-stats', 'counters-sqlite']],
   );
   assert.equal(typeof infoBody.schemaVersion, 'number');
   assert.equal(typeof infoBody.serviceCore, 'string');

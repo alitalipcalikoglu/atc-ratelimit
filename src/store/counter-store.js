@@ -22,7 +22,31 @@ export class CounterStore {
       series: db.prepare(`SELECT hour_start, allowed, denied FROM decisions WHERE policy = ? AND hour_start >= ? ORDER BY hour_start`),
       totals: db.prepare(`SELECT policy, SUM(allowed) AS allowed, SUM(denied) AS denied FROM decisions WHERE hour_start >= ? GROUP BY policy`),
       cleanupDecisions: db.prepare(`DELETE FROM decisions WHERE hour_start < ?`),
+      all: db.prepare(`SELECT policy, subject, window, window_start, count FROM counters WHERE window_start + window * 2000 > ?`),
+      set: db.prepare(`INSERT INTO counters (policy, subject, window, window_start, count) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT (policy, subject, window, window_start) DO UPDATE SET count = excluded.count`),
+      decideMany: db.prepare(`INSERT INTO decisions (policy, hour_start, allowed, denied) VALUES (?, ?, ?, ?)
+        ON CONFLICT (policy, hour_start) DO UPDATE SET allowed = allowed + excluded.allowed, denied = denied + excluded.denied`),
     };
+    this.db = db;
+  }
+
+  /** Live counter rows, for loading the memory backend at start. @param {number} now */
+  live(now) {
+    return /** @type {{ policy: string, subject: string, window: number, window_start: number, count: number }[]} */ (this.stmt.all.all(now))
+      .map((r) => ({ policy: r.policy, subject: r.subject, window: Number(r.window), windowStart: Number(r.window_start), count: Number(r.count) }));
+  }
+
+  /**
+   * Write absolute counter values and add decision deltas in one transaction (memory backend flush).
+   * @param {{ policy: string, subject: string, window: number, windowStart: number, count: number }[]} counters
+   * @param {{ policy: string, hourStart: number, allowed: number, denied: number }[]} decisions
+   */
+  flush(counters, decisions) {
+    this.db.transaction(() => {
+      for (const c of counters) this.stmt.set.run(c.policy, c.subject, c.window, c.windowStart, c.count);
+      for (const d of decisions) this.stmt.decideMany.run(d.policy, d.hourStart, d.allowed, d.denied);
+    });
   }
 
   /**

@@ -202,7 +202,8 @@ the *original* caller of whatever service is being protected is the caller's job
 **B — single-node stateful**: one process owns one SQLite file, `instances: 1` pinned in
 `ecosystem.config.cjs` ("one process per SQLite file"), and the README's own "Out of scope" section
 already states this explicitly ("Distributed counters across several instances of this service: one
-process owns one database").
+process owns one database"). With `COUNTER_BACKEND=memory` this is a hard requirement rather than a
+convention: the counters live in the process, so a second process would not see them at all.
 
 **The check/consume path specifically is safe under two processes sharing one file**, which is a
 materially different answer from `atc-shortlink`'s redirect path. `RateLimitService` never touches

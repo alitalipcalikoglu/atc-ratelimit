@@ -19,7 +19,7 @@ import { SlidingWindow } from './sliding-window.js';
  *
  * This service knows nothing about SQLite, transactions, or SQL: policy/override lookup and cost
  * validation are pure domain logic, and every counter read/write goes through the injected
- * `backend`. `SqliteCounterBackend` is the only implementation today.
+ * `backend`: `SqliteCounterBackend` (default) or `MemoryCounterBackend` (`COUNTER_BACKEND=memory`).
  *
  * Clock model: every instant this service reasons about — `now()`, override expiry, window
  * selection — comes from the injected `now` function (real wall clock in production, an
