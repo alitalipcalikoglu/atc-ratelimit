@@ -1353,6 +1353,10 @@ components:
         counters:
           type: integer
           description: Live counter rows across every policy (unscoped by key).
+        backend:
+          type: string
+          enum: [sqlite, memory]
+          description: The active counter backend (`COUNTER_BACKEND`); `memory` flushes every `COUNTER_FLUSH_MS` and is one process only.
         dbBytes:
           type: integer
           description: Database file size in bytes (unscoped by key).

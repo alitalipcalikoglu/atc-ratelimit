@@ -71,7 +71,7 @@ Errors are JSON: `{ "error": { "code", "message", "details?" } }`.
 | PUT / DELETE | `/v1/policies/:name/overrides/:subject` | write | `{ limits, note?, expiresAt? }` replaces; delete. |
 | GET | `/v1/policies/:name/subjects/:subject` | read | `{ usage, override }` without charging. |
 | DELETE | `/v1/policies/:name/subjects/:subject/usage` | write | Forget the subject's counters → `{ removed }`. |
-| GET | `/v1/stats` | read | Totals and per-policy 24 h numbers. |
+| GET | `/v1/stats` | read | Totals, the active counter `backend` and per-policy 24 h numbers. |
 | GET | `/metrics` | read | Prometheus text: policies, decisions since start, counters, database size, uptime. |
 
 ## Conventions

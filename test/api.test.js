@@ -118,6 +118,7 @@ test('API: policy lifecycle, checks, batch, release, overrides, usage, top, stat
   assert.equal((await app.inject({ method: 'PATCH', url: '/v1/policies/api', headers: bearer(WRITE_KEY), payload: {} })).statusCode, 400);
 
   res = await app.inject({ url: '/v1/stats', headers: bearer(READ_KEY) });
+  assert.equal(json(res).backend, 'sqlite', 'the stats say which counter backend runs');
   assert.deepEqual([json(res).policies, json(res).last24h, json(res).items.map((/** @type {any} */ p) => p.name)], [2, { allowed: 6, denied: 4 }, ['api', 'login']]);
   const metrics = await app.inject({ url: '/metrics', headers: bearer(READ_KEY) });
   assert.match(metrics.body, /ratelimit_decisions_total\{policy="api",decision="denied"\} 3\n/);

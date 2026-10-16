@@ -163,7 +163,7 @@ export class RateLimitApi {
 
     api.get('/stats', read, async (request) => {
       const items = visible(request).map(view);
-      return { policies: items.length, last24h: { allowed: items.reduce((a, p) => a + p.last24h.allowed, 0), denied: items.reduce((a, p) => a + p.last24h.denied, 0) }, counters: s.counterTotal(), dbBytes: this.db.sizeBytes(), items: items.map((p) => ({ name: p.name, limits: p.limits, overrides: p.overrides, activeSubjects: p.activeSubjects, last24h: p.last24h })) };
+      return { policies: items.length, last24h: { allowed: items.reduce((a, p) => a + p.last24h.allowed, 0), denied: items.reduce((a, p) => a + p.last24h.denied, 0) }, counters: s.counterTotal(), backend: this.config.counterBackend, dbBytes: this.db.sizeBytes(), items: items.map((p) => ({ name: p.name, limits: p.limits, overrides: p.overrides, activeSubjects: p.activeSubjects, last24h: p.last24h })) };
     });
   }
 
