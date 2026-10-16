@@ -93,12 +93,16 @@ test('API: policy lifecycle, checks, batch, release, overrides, usage, top, stat
   assert.deepEqual([d.allowed, d.blocked, d.retryAfter], [false, true, null]);
   res = await app.inject({ url: '/v1/policies/api/overrides?limit=10', headers: bearer(READ_KEY) });
   assert.deepEqual([json(res).total, json(res).items.map((/** @type {any} */ o) => o.subject)], [2, ['abuser', 'partner-1']]);
+  res = await app.inject({ url: '/v1/policies/api/overrides?limit=1', headers: bearer(READ_KEY) });
+  assert.deepEqual([json(res).items[0].subject, json(res).nextCursor], ['abuser', 'abuser']);
+  res = await app.inject({ url: '/v1/policies/api/overrides?limit=1&cursor=abuser', headers: bearer(READ_KEY) });
+  assert.deepEqual([json(res).items[0].subject, json(res).nextCursor], ['partner-1', null], 'the last page has no cursor');
   assert.equal((await app.inject({ method: 'PUT', url: '/v1/policies/api/overrides/x', headers: bearer(WRITE_KEY), payload: { limits: [{ window: 60, limit: 1 }], expiresAt: '2020-01-01T00:00:00Z' } })).statusCode, 400);
   assert.equal((await app.inject({ method: 'DELETE', url: '/v1/policies/api/overrides/abuser', headers: bearer(WRITE_KEY) })).statusCode, 204);
   assert.equal((await app.inject({ method: 'DELETE', url: '/v1/policies/api/overrides/abuser', headers: bearer(WRITE_KEY) })).statusCode, 404);
 
   res = await app.inject({ url: '/v1/policies/api/top?limit=2', headers: bearer(READ_KEY) });
-  assert.deepEqual(json(res), { window: 60, limit: 3, items: [{ subject: '203.0.113.7', used: 2 }, { subject: 'partner-1', used: 2 }] });
+  assert.deepEqual(json(res), { window: 60, limit: 3, items: [{ subject: '203.0.113.7', used: 2 }, { subject: 'partner-1', used: 2 }], nextCursor: null });
   assert.equal((await app.inject({ url: '/v1/policies/api/top?window=7', headers: bearer(READ_KEY) })).statusCode, 400);
   res = await app.inject({ url: '/v1/policies/api', headers: bearer(READ_KEY) });
   assert.deepEqual([json(res).policy.overrides, json(res).policy.activeSubjects, json(res).policy.last24h], [1, 3, { allowed: 5, denied: 3 }]);

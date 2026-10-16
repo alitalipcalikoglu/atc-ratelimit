@@ -46,7 +46,7 @@ Checks answer `allowed: false, blocked: true, retryAfter: null`; a middleware sh
 ## List, update, remove
 
 ```bash
-rcurl "$RL/v1/policies/api/overrides?limit=50&offset=0"
+rcurl "$RL/v1/policies/api/overrides?limit=50"   # { items, total, nextCursor }; pass nextCursor back as &cursor=
 rcurl -X PUT $RL/v1/policies/api/overrides/key_partner -d '{ "limits": [ { "window": 60, "limit": 2000 } ] }'   # PUT replaces
 rcurl -X DELETE $RL/v1/policies/api/overrides/key_partner                                                       # 204
 ```

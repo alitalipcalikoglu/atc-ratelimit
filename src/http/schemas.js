@@ -6,7 +6,6 @@ export class Schemas {
   static limits = { type: 'array', minItems: 1, maxItems: 20, items: { type: 'object', additionalProperties: false, required: ['window', 'limit'], properties: { window: { type: 'integer', minimum: 1 }, limit: { type: 'integer', minimum: 0 } } } };
   static cost = { type: 'integer', minimum: 0 };
   static limit = { type: 'string', pattern: '^([1-9]|[1-9][0-9]|[1-9][0-9][0-9]|1000)$' };
-  static offset = { type: 'string', pattern: '^(0|[1-9][0-9]{0,6})$' };
 
   /**
    * @param {string[]} required
@@ -25,7 +24,7 @@ export class Schemas {
 
   static nameParams = { type: 'object', properties: { name: Schemas.name }, required: ['name'] };
   static subjectParams = { type: 'object', properties: { name: Schemas.name, subject: Schemas.subject }, required: ['name', 'subject'] };
-  static listQuery = { type: 'object', additionalProperties: false, properties: { limit: Schemas.limit, offset: Schemas.offset } };
+  static listQuery = { type: 'object', additionalProperties: false, properties: { limit: Schemas.limit, cursor: Schemas.subject } };
   static topQuery = { type: 'object', additionalProperties: false, properties: { window: { type: 'string', pattern: '^[1-9][0-9]{0,7}$' }, limit: Schemas.limit } };
   static statsQuery = { type: 'object', additionalProperties: false, properties: { hours: { type: 'string', pattern: '^([1-9]|[1-9][0-9]|[1-6][0-9][0-9]|7[0-1][0-9]|720)$' } } };
 }

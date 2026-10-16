@@ -318,6 +318,8 @@ paths:
   /v1/policies:
     post:
       operationId: atc-ratelimit.policies.create
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
       summary: Create a policy
       description: >-
         Requires a `write` (or `readwrite`) API key, scoped to the new policy's own name. Returns
@@ -583,7 +585,7 @@ paths:
     get:
       operationId: atc-ratelimit.overrides.list
       summary: List a policy's subject overrides
-      description: Requires a `read` (or `readwrite`) API key, scoped to this policy. Offset-paginated.
+      description: Requires a `read` (or `readwrite`) API key, scoped to this policy. Ordered by subject; pass `nextCursor` back as `cursor` for the next page.
       x-required-role: read
       x-policy-scoped: true
       parameters:
@@ -595,13 +597,14 @@ paths:
           schema:
             type: string
             pattern: '^([1-9]|[1-9][0-9]|[1-9][0-9][0-9]|1000)$'
-        - name: offset
+        - name: cursor
           in: query
           required: false
-          description: Rows to skip. Default 0.
+          description: Opaque `nextCursor` from the previous page.
           schema:
             type: string
-            pattern: '^(0|[1-9][0-9]{0,6})$'
+            minLength: 1
+            maxLength: 200
       responses:
         '200':
           description: Overrides for this policy.
@@ -834,6 +837,12 @@ components:
         with a `WWW-Authenticate: Bearer` header; 403 is always
         `{"error":{"code":"FORBIDDEN","message":"..."}}`.
   parameters:
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: "Optional. Repeats of this POST with the same key (per API key, 24 h) replay the first 2xx answer with `Idempotent-Replayed: true` instead of running again; the same key with another method, path or body is `409 IDEMPOTENCY_MISMATCH`, while the first still runs `409 IDEMPOTENCY_IN_PROGRESS`."
+      schema: { type: string, pattern: '^[A-Za-z0-9._:-]{8,255}$' }
     PolicyName:
       name: name
       in: path
@@ -1234,8 +1243,9 @@ components:
           $ref: '#/components/schemas/Policy'
     PoliciesListResponse:
       type: object
-      required: [items]
+      required: [items, nextCursor]
       properties:
+        nextCursor: { type: 'null', description: Always null; the list is complete. }
         items:
           type: array
           items:
@@ -1268,8 +1278,9 @@ components:
                 type: integer
     TopResponse:
       type: object
-      required: [window, limit, items]
+      required: [window, limit, items, nextCursor]
       properties:
+        nextCursor: { type: 'null', description: Always null; the top list is one ranked page. }
         window:
           type: integer
           description: The resolved window (seconds) these results were computed against.
@@ -1289,7 +1300,7 @@ components:
                 description: Sliding-window usage estimate.
     OverridesListResponse:
       type: object
-      required: [items, total, limit, offset]
+      required: [items, total, nextCursor]
       properties:
         items:
           type: array
@@ -1297,11 +1308,10 @@ components:
             $ref: '#/components/schemas/Override'
         total:
           type: integer
-          description: Total overrides for this policy, independent of limit/offset.
-        limit:
-          type: integer
-        offset:
-          type: integer
+          description: Total overrides for this policy, independent of paging.
+        nextCursor:
+          type: [string, 'null']
+          description: Pass as `cursor` for the next page; `null` on the last page.
     OverrideResponse:
       type: object
       required: [override]

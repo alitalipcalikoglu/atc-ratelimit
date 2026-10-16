@@ -12,7 +12,7 @@ export class OverrideStore {
       upsert: db.prepare(`INSERT INTO overrides (${C}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (policy, subject) DO UPDATE SET limits = excluded.limits, note = excluded.note, expires_at = excluded.expires_at, updated_at = excluded.updated_at`),
       get: db.prepare(`SELECT ${C} FROM overrides WHERE policy = ? AND subject = ?`),
-      list: db.prepare(`SELECT ${C} FROM overrides WHERE policy = ? ORDER BY updated_at DESC, subject LIMIT ? OFFSET ?`),
+      list: db.prepare(`SELECT ${C} FROM overrides WHERE policy = ? AND subject > ? ORDER BY subject LIMIT ?`),
       count: db.prepare(`SELECT COUNT(*) AS n FROM overrides WHERE policy = ?`),
       counts: db.prepare(`SELECT policy, COUNT(*) AS n FROM overrides GROUP BY policy`),
       delete: db.prepare(`DELETE FROM overrides WHERE policy = ? AND subject = ?`),
@@ -37,9 +37,9 @@ export class OverrideStore {
     return row && (row.expires_at === null || row.expires_at > now) ? row : undefined;
   }
 
-  /** @param {string} policy @param {number} limit @param {number} offset */
-  list(policy, limit, offset) {
-    return /** @type {OverrideRow[]} */ (this.stmt.list.all(policy, limit, offset));
+  /** Subject order, so the last subject of a page is the cursor of the next. @param {string} policy @param {number} limit @param {string} [after] */
+  list(policy, limit, after = '') {
+    return /** @type {OverrideRow[]} */ (this.stmt.list.all(policy, after, limit));
   }
 
   /** @param {string} policy */

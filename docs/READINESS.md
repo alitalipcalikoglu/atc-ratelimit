@@ -71,7 +71,7 @@ force-exit, same numbers and comment as `atc-flags`/`atc-shortlink`.
   own `/v1/*` (the service rate-limits itself the same way `atc-flags`/`atc-shortlink` do).
 - `max_memory_restart: '300M'` in `ecosystem.config.cjs`.
 - No explicit page-size cap is enforced server-side for `/v1/policies/:name/overrides` beyond the
-  caller-supplied `limit`/`offset` (default `limit=50`, `offset=0`, no documented server-side max).
+  the caller-supplied `limit` (default 50, max 1000); pages continue by `cursor` (subject order).
 
 ## Timeouts
 - Audit outbound call: `timeoutMs = 5_000` default, unchanged by `Application`.
@@ -92,8 +92,8 @@ current call are exhausted. There is no retry logic anywhere else in this servic
 code).
 
 ## Idempotency
-- `POST /v1/policies` (create) is **not** idempotent: repeating it with the same `name` fails `409
-  POLICY_EXISTS`.
+- `POST /v1/policies` (create) honours `Idempotency-Key` (core `Idempotency`, 24 h, per API key and
+  caller): a repeat replays the first 201. Without the header a repeat fails `409 POLICY_EXISTS`.
 - `PATCH /v1/policies/:name` is idempotent in result for a fixed patch.
 - `DELETE /v1/policies/:name` is **not** safe to repeat: `removePolicy` calls `this.policies.require(name)`
   first, which throws `404 POLICY_NOT_FOUND` once the policy is already gone.

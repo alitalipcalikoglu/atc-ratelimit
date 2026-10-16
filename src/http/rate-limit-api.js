@@ -3,6 +3,7 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 import { AuditClient } from '@atc-web/atc-service-core/audit';
 import { createErrorHandler, jsonParser, registerInfo, registerOpenApi, registerProbes, registerRequestContext, requestOptions } from '@atc-web/atc-service-core/fastify';
+import { Idempotency } from '@atc-web/atc-service-core/idempotency';
 import { RateLimitError } from '../domain/errors.js';
 import { ApiKeyAuth } from './api-key-auth.js';
 import { Schemas } from './schemas.js';
@@ -63,6 +64,8 @@ export class RateLimitApi {
       reply.header('x-content-type-options', 'nosniff');
       reply.header('cache-control', 'no-store');
     });
+    // Opt-in per route (config.idempotent): repeats with the same Idempotency-Key replay the first 2xx answer.
+    Idempotency.register(app, { raw: this.db.raw });
     registerProbes(app, () => this.db.ping(), { cacheMs: RateLimitApi.READY_CACHE_MS });
     registerOpenApi(app, new URL('../../openapi.yaml', import.meta.url));
     registerInfo(app, {
@@ -118,14 +121,14 @@ export class RateLimitApi {
     });
 
     // ---- policies
-    api.post('/policies', { config: { audit: AuditClient.route('atc-ratelimit.policy.create', (_r, b) => ({ type: 'policy', id: b.policy.name })) }, ...write, schema: { body: Schemas.createPolicy } }, async (request, reply) => {
+    api.post('/policies', { config: { idempotent: true, audit: AuditClient.route('atc-ratelimit.policy.create', (_r, b) => ({ type: 'policy', id: b.policy.name })) }, ...write, schema: { body: Schemas.createPolicy } }, async (request, reply) => {
       const b = /** @type {{ name: string, limits: unknown, description?: string }} */ (request.body);
       ApiKeyAuth.assertPolicy(request.apiKey, b.name);
       const row = s.createPolicy(b, request.apiKey.id);
       reply.header('location', `/v1/policies/${row.name}`);
       return reply.code(201).send({ policy: view(row) });
     });
-    api.get('/policies', read, async (request) => ({ items: visible(request).map(view) }));
+    api.get('/policies', read, async (request) => ({ items: visible(request).map(view), nextCursor: null }));
     api.get('/policies/:name', { ...read, schema: { params: Schemas.nameParams } }, async (request) => ({ policy: view(s.getPolicy(name(request))) }));
     api.patch('/policies/:name', { config: { audit: AuditClient.route('atc-ratelimit.policy.update', (r) => ({ type: 'policy', id: /** @type {any} */ (r.params).name }), (r) => ({ patch: r.body })) }, ...write, schema: { params: Schemas.nameParams, body: Schemas.patchPolicy } }, async (request) => ({ policy: view(s.updatePolicy(name(request), /** @type {any} */ (request.body))) }));
     api.delete('/policies/:name', { config: { audit: AuditClient.route('atc-ratelimit.policy.delete', (r) => ({ type: 'policy', id: /** @type {any} */ (r.params).name })) }, ...write, schema: { params: Schemas.nameParams } }, async (request, reply) => { s.removePolicy(name(request)); return reply.code(204).send(); });
@@ -135,7 +138,7 @@ export class RateLimitApi {
     });
     api.get('/policies/:name/top', { ...read, schema: { params: Schemas.nameParams, querystring: Schemas.topQuery } }, async (request) => {
       const q = query(request);
-      return s.top(name(request), q.window ? Number(q.window) : undefined, Number(q.limit ?? 20));
+      return { ...s.top(name(request), q.window ? Number(q.window) : undefined, Number(q.limit ?? 20)), nextCursor: null };
     });
 
     // ---- overrides
@@ -144,8 +147,9 @@ export class RateLimitApi {
       const n = name(request);
       s.getPolicy(n);
       const limit = Number(q.limit ?? 50);
-      const offset = Number(q.offset ?? 0);
-      return { items: this.overrides.list(n, limit, offset).map((o) => Views.override(o, s.now())), total: this.overrides.count(n), limit, offset };
+      const rows = this.overrides.list(n, limit + 1, q.cursor ? String(q.cursor) : '');
+      const page = rows.slice(0, limit);
+      return { items: page.map((o) => Views.override(o, s.now())), total: this.overrides.count(n), nextCursor: rows.length > limit ? page[page.length - 1].subject : null };
     });
     api.put('/policies/:name/overrides/:subject', { config: { audit: AuditClient.route('atc-ratelimit.override.set', (r) => ({ type: 'subject', id: /** @type {any} */ (r.params).subject }), (r) => ({ policy: /** @type {any} */ (r.params).name, ...(/** @type {object} */ (r.body ?? {})) })) }, ...write, schema: { params: Schemas.subjectParams, body: Schemas.override } }, async (request) => ({ override: Views.override(s.setOverride(name(request), subject(request), /** @type {any} */ (request.body), request.apiKey.id), s.now()) }));
     api.delete('/policies/:name/overrides/:subject', { config: { audit: AuditClient.route('atc-ratelimit.override.delete', (r) => ({ type: 'subject', id: /** @type {any} */ (r.params).subject }), (r) => ({ policy: /** @type {any} */ (r.params).name })) }, ...write, schema: { params: Schemas.subjectParams } }, async (request, reply) => { s.removeOverride(name(request), subject(request)); return reply.code(204).send(); });

@@ -67,12 +67,17 @@ Errors are JSON: `{ "error": { "code", "message", "details?" } }`.
 | PATCH / DELETE | `/v1/policies/:name` | write | `{ description?, limits? }`; delete with overrides, counters and statistics. |
 | GET | `/v1/policies/:name/stats` | read | `hours` (default 24, up to 720) → hourly `{ allowed, denied }` series. |
 | GET | `/v1/policies/:name/top` | read | `window` (default shortest), `limit` → subjects by current usage. |
-| GET | `/v1/policies/:name/overrides` | read | Overrides, newest first (`limit`, `offset`). |
+| GET | `/v1/policies/:name/overrides` | read | Overrides by subject (`limit`, `cursor`). |
 | PUT / DELETE | `/v1/policies/:name/overrides/:subject` | write | `{ limits, note?, expiresAt? }` replaces; delete. |
 | GET | `/v1/policies/:name/subjects/:subject` | read | `{ usage, override }` without charging. |
 | DELETE | `/v1/policies/:name/subjects/:subject/usage` | write | Forget the subject's counters → `{ removed }`. |
 | GET | `/v1/stats` | read | Totals and per-policy 24 h numbers. |
 | GET | `/metrics` | read | Prometheus text: policies, decisions since start, counters, database size, uptime. |
+
+## Conventions
+
+- Lists answer `{ items, nextCursor }`; pass `nextCursor` back as `cursor`. Policies and the top list are complete (`nextCursor: null`); overrides page by subject. Policy names and subjects are natural keys.
+- Policy creation honours `Idempotency-Key`: a repeat with the same key (per API key and caller — the console's `X-Actor` counts — for 24 h) replays the first 2xx answer with `Idempotent-Replayed: true`; another body is `409 IDEMPOTENCY_MISMATCH`. Checks are not idempotent by design: each call consumes.
 
 ## Examples
 
