@@ -140,10 +140,14 @@ transaction, and SQLite has one writer: on very busy routes that is the ceiling.
 answers a check with a few in-memory lookups and writes the changed counters and the hourly decision
 totals to SQLite in one transaction every `COUNTER_FLUSH_MS` (default 1000 ms). The batch
 all-or-nothing contract holds because a check runs synchronously to the end inside the one process.
-Costs: it is strictly one process per database (a second process would keep its own counts and the
-effective limit would double; PM2 `instances: 1` is already the default); a crash loses at most the
-last flush interval of consumption, so clients may get that much extra allowance once; a clean
-shutdown flushes, and start-up loads the live counters back. Statistics (`/stats`, hourly series)
+Limits of the memory backend, so choose it knowingly: it is strictly one process per database (a
+second process, a `--split-workers` layout or PM2 `instances` above 1 keeps separate counts and the
+effective limit multiplies); a crash or a `SIGKILL` loses the increments since the last flush, so the
+windows restart that much short and clients get up to one `COUNTER_FLUSH_MS` of extra allowance
+once (keep the flush interval short, and let PM2's `wait_ready` plus `kill_timeout` cover the final
+flush on a clean stop); it suits short-window, high-rate policies, not long quotas (a daily quota
+can lose one second of counting on every restart). The SQLite backend has none of these limits and
+stays the default. Statistics (`/stats`, hourly series)
 flush first, so they stay exact. `/metrics` adds `ratelimit_counter_flushes_total{result}` and
 `ratelimit_counter_unflushed`.
 
